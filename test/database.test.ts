@@ -52,6 +52,20 @@ test("Migraciones completas, RLS y operaciones atómicas en PostgreSQL", async (
     const create = (resource: string, p: unknown) =>
       rpc("create_resource", [resource, JSON.stringify(p)]);
     await login(u);
+    await t.test("Administradores editan y eliminan espacios sin objetivos", async () => {
+      const space = await create("spaces", { name: "Temporal" });
+      await login(v);
+      await assert.rejects(rpc("edit_space", [space, "Intruso"]), /Forbidden/);
+      await assert.rejects(rpc("delete_space", [space]), /Forbidden/);
+      await login(u);
+      await assert.rejects(rpc("edit_space", [space, "  "]), /inválido/);
+      await rpc("edit_space", [space, "Nuevo nombre"]);
+      const renamed = await db.query<{ name: string }>("select name from public.shared_spaces where id=$1", [space]);
+      assert.equal(renamed.rows[0].name, "Nuevo nombre");
+      await rpc("delete_space", [space]);
+      assert.equal((await db.query("select * from public.shared_spaces where id=$1", [space])).rows.length, 0);
+      assert.equal((await db.query("select * from public.shared_space_members where space_id=$1", [space])).rows.length, 0);
+    });
     await t.test(
       "Invitaciones registradas requieren aceptación y protegen acceso",
       async () => {

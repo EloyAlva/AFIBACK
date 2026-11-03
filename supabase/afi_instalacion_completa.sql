@@ -846,6 +846,37 @@ revoke execute on function public.afi_recovery_issue(uuid,text,text,timestamptz)
 grant execute on function public.afi_recovery_issue(uuid,text,text,timestamptz),public.afi_recovery_consume(text,text),public.afi_recovery_question(text),public.afi_recovery_save_question(uuid,text,text,text,text,boolean),public.afi_recovery_claim(text,text),public.afi_recovery_finish(text,text,boolean) to service_role;
 notify pgrst,'reload schema';
 $afi_migration_8$;
+  -- 010_space_management.sql
+  execute $afi_migration_9$
+create or replace function public.edit_space(s uuid, new_name text) returns void
+language plpgsql security definer set search_path='' as $$
+begin
+ perform public.require_user();
+ perform 1 from public.shared_spaces where id=s for update;
+ if not public.is_admin(s) then raise exception 'Forbidden'; end if;
+ if new_name is null or length(trim(new_name)) not between 1 and 120 then
+  raise exception 'Nombre de espacio inválido';
+ end if;
+ update public.shared_spaces set name=trim(new_name) where id=s;
+end $$;
+
+create or replace function public.delete_space(s uuid) returns void
+language plpgsql security definer set search_path='' as $$
+begin
+ perform public.require_user();
+ perform 1 from public.shared_spaces where id=s for update;
+ if not public.is_admin(s) then raise exception 'Forbidden'; end if;
+ if exists(select 1 from public.savings_goals where space_id=s) then
+  raise exception 'No se puede eliminar un espacio con objetivos asociados';
+ end if;
+ delete from public.shared_space_invitations where space_id=s;
+ delete from public.shared_space_members where space_id=s;
+ delete from public.shared_spaces where id=s;
+end $$;
+
+revoke execute on function public.edit_space(uuid,text),public.delete_space(uuid) from public,anon;
+grant execute on function public.edit_space(uuid,text),public.delete_space(uuid) to authenticated;
+$afi_migration_9$;
  else
   foreach required_table in array array['profiles','user_preferences','financial_accounts','categories','credit_cards','debts','payment_obligations','payment_occurrences','financial_transactions','transaction_entries','obligation_payments','budgets','credit_card_purchases','credit_card_installments','credit_card_statements','debt_installments','shared_spaces','shared_space_members','shared_space_invitations','savings_goals','savings_goal_members','savings_plans','savings_fund_movements','savings_allocations','notifications','notification_preferences','ai_usage_limits','ai_usage_logs','ai_drafts','audit_logs','savings_operations'] loop
    if to_regclass('public.'||required_table) is null then

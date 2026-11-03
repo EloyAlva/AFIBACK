@@ -691,6 +691,20 @@ export async function buildApp(app = Fastify(serverOptions)) {
           return { space_id: await rpc(req.db, "respond_invitation", p) };
         },
       );
+      api.patch("/spaces/:id", async (req) => {
+        const p = resources.spaces.parse(req.body);
+        await rpc(req.db, "edit_space", {
+          s: uuid.parse((req.params as any).id),
+          new_name: p.name,
+        });
+        return { ok: true };
+      });
+      api.delete("/spaces/:id", async (req) => {
+        await rpc(req.db, "delete_space", {
+          s: uuid.parse((req.params as any).id),
+        });
+        return { ok: true };
+      });
       api.post(
         "/spaces/:id/manage",
         {
