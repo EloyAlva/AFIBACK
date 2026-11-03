@@ -774,6 +774,7 @@ export async function buildApp(app = Fastify(serverOptions)) {
                 .number()
                 .nonnegative()
                 .max(100000),
+              savings_target_percentage: z.number().min(0).max(100).optional(),
               budget_thresholds: z
                 .array(z.number().int().min(1).max(100))
                 .min(1)

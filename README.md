@@ -1,5 +1,11 @@
 # AFI Backend
 
+## Meta mensual de ahorro
+
+En instalaciones existentes, aplica `supabase/migrations/011_savings_target.sql`. Añade `user_preferences.savings_target_percentage` (20% predeterminado, configurable entre 0% y 100%) y actualiza `update_profile` conservando las preferencias anteriores cuando no se envía el nuevo campo. `PUT /api/v1/profile` admite el campo opcional `savings_target_percentage`.
+
+El dashboard devuelve `savingsIndicator`: importe objetivo, reservas netas del mes, porcentaje real, importe faltante, progreso y estado (`no_income`, `behind`, `on_track`). Usa ingresos y movimientos del fondo de la misma moneda, usuario y mes en la zona horaria del perfil; excluye transacciones anuladas. Distribuir el fondo entre objetivos no vuelve a contar como ahorro nuevo. Los porcentajes de participación de personas siguen guardándose por objetivo en `savings_goal_members` mediante `PUT /goals/:id/members`.
+
 ## Variables mínimas en Vercel
 
 Conserva únicamente las variables de conexión y claves:

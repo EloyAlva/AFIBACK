@@ -2,6 +2,35 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { occurrenceStatus, summarize, csv } from "../src/finance.js";
 import { transaction, resources } from "../src/schemas.js";
+
+test("Meta mensual usa ingresos y reservas netas del mismo mes, usuario y moneda", () => {
+  const data = {
+    preferences: [{ savings_target_percentage: 20 }],
+    transactions: [
+      { id: "income", type: "income", amount: 1000, currency: "PEN", occurred_at: "2026-11-01T12:00:00Z" },
+      { id: "save", type: "savings_reserve", amount: 150, currency: "PEN", occurred_at: "2026-11-02T12:00:00Z" },
+      { id: "withdraw", type: "savings_withdrawal", amount: 50, currency: "PEN", occurred_at: "2026-11-03T12:00:00Z" },
+      { id: "old", type: "savings_reserve", amount: 900, currency: "PEN", occurred_at: "2026-10-03T12:00:00Z" },
+      { id: "void", type: "savings_reserve", amount: 900, currency: "PEN", occurred_at: "2026-11-03T12:00:00Z", voided_at: "2026-11-03" },
+    ],
+    "fund-movements": [
+      { transaction_id: "save", user_id: "u", currency: "PEN", amount: 150 },
+      { transaction_id: "withdraw", user_id: "u", currency: "PEN", amount: -50 },
+      { transaction_id: "old", user_id: "u", currency: "PEN", amount: 900 },
+      { transaction_id: "void", user_id: "u", currency: "PEN", amount: 900 },
+      { transaction_id: "save", user_id: "other", currency: "PEN", amount: 900 },
+    ],
+  };
+  const indicator = summarize(data, "PEN", "2026-11", "America/Lima", "u").savingsIndicator;
+  assert.equal(indicator.target, 200);
+  assert.equal(indicator.saved, 100);
+  assert.equal(indicator.actualPercentage, 10);
+  assert.equal(indicator.shortfall, 100);
+  assert.equal(indicator.status, "behind");
+  const empty = summarize({}, "PEN", "2026-11", "America/Lima", "u").savingsIndicator;
+  assert.equal(empty.actualPercentage, null);
+  assert.equal(empty.status, "no_income");
+});
 test("Pagos parciales, totales y vencidos se distinguen", () => {
   assert.deepEqual(occurrenceStatus(800, 300, "2026-11-10", "2026-11-02"), {
     paid: 300,

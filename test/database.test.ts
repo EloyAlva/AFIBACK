@@ -52,6 +52,13 @@ test("Migraciones completas, RLS y operaciones atómicas en PostgreSQL", async (
     const create = (resource: string, p: unknown) =>
       rpc("create_resource", [resource, JSON.stringify(p)]);
     await login(u);
+    await t.test("La meta porcentual de ahorro se guarda solo para el usuario actual", async () => {
+      await rpc("update_profile", [JSON.stringify({ display_name: "Uno", currency: "PEN", timezone: "America/Lima", ant_expense_threshold: 20, savings_target_percentage: 25 })]);
+      assert.equal(Number((await db.query<any>("select savings_target_percentage from public.user_preferences")).rows[0].savings_target_percentage), 25);
+      await login(v);
+      assert.equal(Number((await db.query<any>("select savings_target_percentage from public.user_preferences")).rows[0].savings_target_percentage), 20);
+      await login(u);
+    });
     await t.test("Administradores editan y eliminan espacios sin objetivos", async () => {
       const space = await create("spaces", { name: "Temporal" });
       await login(v);

@@ -98,6 +98,13 @@ export function summarize(
       (a) => a.user_id === userId && a.currency === currency,
     ),
   );
+  const monthlySaved = sum(
+    (data["fund-movements"] ?? []).filter((f) =>
+      f.user_id === userId && f.currency === currency && period.some((t) => t.id === f.transaction_id)),
+  );
+  const savingsTargetPercentage = Number(data.preferences?.[0]?.savings_target_percentage ?? 20);
+  const savingsTarget = income.times(savingsTargetPercentage).div(100);
+  const savingsShortfall = Decimal.max(0, savingsTarget.minus(monthlySaved));
   const occurrences = (data.occurrences ?? [])
     .filter((o) => o.currency === currency)
     .map((o) => ({
@@ -290,6 +297,15 @@ export function summarize(
       ).toNumber(),
     },
     income: income.toNumber(),
+    savingsIndicator: {
+      targetPercentage: savingsTargetPercentage,
+      target: savingsTarget.toNumber(),
+      saved: monthlySaved.toNumber(),
+      actualPercentage: income.gt(0) ? monthlySaved.div(income).times(100).toNumber() : null,
+      shortfall: savingsShortfall.toNumber(),
+      progress: savingsTarget.gt(0) ? Decimal.max(0, monthlySaved.div(savingsTarget).times(100)).toNumber() : null,
+      status: income.isZero() ? "no_income" : savingsShortfall.gt(0) ? "behind" : "on_track",
+    },
     expense: spent.toNumber(),
     balance: income.minus(spent).toNumber(),
     dayIncome: sum(

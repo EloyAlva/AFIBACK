@@ -877,6 +877,20 @@ end $$;
 revoke execute on function public.edit_space(uuid,text),public.delete_space(uuid) from public,anon;
 grant execute on function public.edit_space(uuid,text),public.delete_space(uuid) to authenticated;
 $afi_migration_9$;
+  -- 011_savings_target.sql
+  execute $afi_migration_10$
+alter table public.user_preferences add column if not exists savings_target_percentage numeric(5,2) not null default 20 check(savings_target_percentage between 0 and 100);
+
+create or replace function public.update_profile(p jsonb) returns void language plpgsql security definer set search_path='' as $$
+declare u uuid:=public.require_user();
+begin
+ if not exists(select 1 from pg_timezone_names where name=p->>'timezone') then raise exception 'Invalid timezone'; end if;
+ update public.profiles set display_name=p->>'display_name',currency=p->>'currency',timezone=p->>'timezone' where id=u;
+ update public.user_preferences set ant_expense_threshold=(p->>'ant_expense_threshold')::numeric,
+ savings_target_percentage=coalesce((p->>'savings_target_percentage')::numeric,savings_target_percentage),
+ budget_thresholds=case when p?'budget_thresholds' then array(select jsonb_array_elements_text(p->'budget_thresholds')::int) else budget_thresholds end where user_id=u;
+end $$;
+$afi_migration_10$;
  else
   foreach required_table in array array['profiles','user_preferences','financial_accounts','categories','credit_cards','debts','payment_obligations','payment_occurrences','financial_transactions','transaction_entries','obligation_payments','budgets','credit_card_purchases','credit_card_installments','credit_card_statements','debt_installments','shared_spaces','shared_space_members','shared_space_invitations','savings_goals','savings_goal_members','savings_plans','savings_fund_movements','savings_allocations','notifications','notification_preferences','ai_usage_limits','ai_usage_logs','ai_drafts','audit_logs','savings_operations'] loop
    if to_regclass('public.'||required_table) is null then
