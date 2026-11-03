@@ -24,6 +24,7 @@ import { csv, summarize, type Row } from "./finance.js";
 import { draftSchema, interpret } from "./ai.js";
 import { registerPasswordRecovery } from "./password-recovery.js";
 import { registerSecurityQuestions } from "./security-question.js";
+import { registerAuth } from "./auth.js";
 declare module "fastify" {
   interface FastifyRequest {
     db: SupabaseClient;
@@ -107,19 +108,20 @@ export async function buildApp() {
           requestId: req.id,
         },
       });
-    const e = error as Error & { statusCode?: number };
+    const e = error as Error & { statusCode?: number; code?: string };
     const status = e.statusCode ?? 500;
     if (status >= 500) req.log.error({ err: e }, "request failed");
     reply.code(status).send({
       error: {
         code:
-          status === 401
+          e.code ??
+          (status === 401
             ? "UNAUTHORIZED"
             : status === 422
               ? "BUSINESS_RULE"
               : status === 429
                 ? "RATE_LIMIT"
-                : "REQUEST_ERROR",
+                : "REQUEST_ERROR"),
         message: status === 500 ? "Error interno del servidor" : e.message,
         requestId: req.id,
       },
@@ -137,6 +139,7 @@ export async function buildApp() {
     }),
   );
   await registerPasswordRecovery(app);
+  await registerAuth(app);
   await registerSecurityQuestions(app);
   await app.register(
     async (api) => {

@@ -1,5 +1,43 @@
 # AFI Backend
 
+## Autenticación centralizada
+
+El frontend solo necesita `NEXT_PUBLIC_API_URL` apuntando a `/api/v1` de este servicio.
+AFIBACK se conecta a Supabase Auth, PostgreSQL mediante Supabase y el proveedor de IA.
+Las claves de Supabase y de IA se configuran exclusivamente como variables del backend.
+
+Rutas de Auth:
+
+| Ruta | Operación |
+| --- | --- |
+| `POST /api/v1/auth/login` | Usuario/correo y contraseña; devuelve una sesión |
+| `POST /api/v1/auth/register` | Registro con nombre, correo y contraseña |
+| `POST /api/v1/auth/refresh` | Rotación del refresh token |
+| `POST /api/v1/auth/session` | Verificar el token de un enlace de confirmación/recuperación |
+| `POST /api/v1/auth/logout` | Cerrar la sesión actual |
+| `POST /api/v1/auth/recover` | Enviar enlace de recuperación al correo real |
+| `PUT /api/v1/auth/password` | Cambiar contraseña con Bearer válido |
+| `POST /api/v1/auth/reauthenticate` | Solicitar verificación adicional cuando Auth la requiere |
+
+El backend normaliza usuarios cortos a `@afi.com`, verifica identidades con Supabase
+y devuelve únicamente los tokens y un resumen del usuario. Las respuestas de Auth
+usan `Cache-Control: no-store`; las rutas sensibles tienen límites específicos.
+Los enlaces solo permiten URLs de retorno cuyos orígenes están en `FRONTEND_URL`.
+Las consultas financieras siguen ejecutándose con el JWT del usuario y RLS,
+sin sustituirlo por service role. Las rutas de pregunta de seguridad y código
+de recuperación se conservan.
+
+En el backend configura `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY` (recuperación administrativa) y
+`FRONTEND_URL=https://TU-FRONTEND.vercel.app`. Para varios orígenes, sepáralos
+con comas. Las variables de IA se describen en `.env.example`.
+`DATABASE_URL` no se usa para operaciones normales: se consulta la base a través
+de Supabase. Esta actualización no requiere migraciones SQL adicionales.
+
+El servicio sigue requiriendo Node.js y almacenamiento persistente para los códigos
+y preguntas de recuperación; centralizar Auth no convierte SQLite en almacenamiento
+persistente de Vercel Functions. El frontend sí se puede alojar en Vercel.
+
 API independiente en Node.js + TypeScript + Fastify. Requiere Node.js 22 o superior y un proyecto Supabase nuevo. No depende del frontend para compilar o funcionar.
 
 ## Configuración y desarrollo
