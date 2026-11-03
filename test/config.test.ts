@@ -15,14 +15,20 @@ test("FRONTEND_URL normaliza dominio, barra final y varios orígenes para CORS",
   assert.equal(
     parseConfig({ ...minimal, FRONTEND_URL: "afifront.vercel.app/" })
       .FRONTEND_URL,
-    "https://afifront.vercel.app",
+    ["https://afifront.vercel.app", ...defaults.additionalFrontendOrigins].join(
+      ",",
+    ),
   );
   assert.equal(
     parseConfig({
       ...minimal,
       FRONTEND_URL: "https://afifront.vercel.app/, http://localhost:3000/",
     }).FRONTEND_URL,
-    "https://afifront.vercel.app,http://localhost:3000",
+    [
+      "https://afifront.vercel.app",
+      "http://localhost:3000",
+      ...defaults.additionalFrontendOrigins,
+    ].join(","),
   );
   assert.throws(() =>
     parseConfig({ ...minimal, FRONTEND_URL: "ftp://afifront.vercel.app" }),
@@ -38,7 +44,7 @@ test("Solo las seis variables del despliegue habilitan IA con valores completos"
   assert.equal(config.AI_MONTHLY_BUDGET_USD, 5);
   assert.equal(config.AI_DEFAULT_MONTHLY_REQUEST_LIMIT, 100);
   assert.equal(config.AI_MAX_OUTPUT_TOKENS, 300);
-  assert.equal(config.FRONTEND_URL, minimal.FRONTEND_URL);
+  assert.equal(config.FRONTEND_URL.split(",")[0], minimal.FRONTEND_URL);
   assert.equal(config.SUPABASE_ANON_KEY, "test-anon");
 });
 test("Sin clave la IA queda apagada; una desactivación explícita se conserva", () => {
@@ -95,8 +101,16 @@ test("Vercel usa producción sin configurar NODE_ENV ni el puerto", () => {
   const production = parseConfig({ ...minimal, FRONTEND_URL: "", VERCEL: "1" });
   assert.equal(production.NODE_ENV, "production");
   assert.equal(production.PORT, 4000);
-  assert.equal(production.FRONTEND_URL, "https://afifront.vercel.app");
-  assert.equal(parseConfig({}).FRONTEND_URL, "http://localhost:3000");
+  assert.equal(
+    production.FRONTEND_URL,
+    ["https://afifront.vercel.app", ...defaults.additionalFrontendOrigins].join(
+      ",",
+    ),
+  );
+  assert.equal(
+    parseConfig({}).FRONTEND_URL.split(",")[0],
+    "http://localhost:3000",
+  );
 });
 
 test("El dominio principal sigue permitido en Vercel con una URL temporal configurada", () => {
@@ -108,6 +122,7 @@ test("El dominio principal sigue permitido en Vercel con una URL temporal config
   assert.deepEqual(configured.FRONTEND_URL.split(","), [
     "https://afifront.vercel.app",
     "https://old-preview.example",
+    ...defaults.additionalFrontendOrigins,
   ]);
   assert.ok(!configured.FRONTEND_URL.includes("*"));
 });

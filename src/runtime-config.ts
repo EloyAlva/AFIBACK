@@ -86,9 +86,10 @@ export function parseConfig(environment: Record<string, string | undefined>) {
   return {
     ...parsed,
     FRONTEND_URL: [
-      ...new Set(
-        production ? [defaults.productionFrontend, ...origins] : origins,
-      ),
+      ...new Set([
+        ...(production ? [defaults.productionFrontend, ...origins] : origins),
+        ...defaults.additionalFrontendOrigins,
+      ]),
     ].join(","),
     AI_ENABLED:
       parsed.AI_ENABLED === undefined

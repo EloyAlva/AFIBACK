@@ -65,7 +65,7 @@ test("La función Vercel responde salud y preflight sin abrir un puerto de Fasti
       assert.ok(
         (edit.headers.get("access-control-allow-methods") ?? "")
           .split(",")
-          .map(value=>value.trim())
+          .map((value) => value.trim())
           .includes(method),
       );
       assert.match(
@@ -146,6 +146,104 @@ test("La función admite JSON ya procesado por Vercel y devuelve errores legible
     );
     assert.equal(large.status, 413);
     assert.equal(large.headers.get("access-control-allow-origin"), origin);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
+});
+
+test("Los orígenes solicitados reciben CORS en todos los métodos y en errores, sin permitir terceros", async () => {
+  const server = createServer((req, res) => {
+    void handler(req, res);
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const base = `http://127.0.0.1:${address.port}`;
+  try {
+    for (const origin of [
+      "https://afifront-git-main-eacode.vercel.app",
+      "http://localhost:5173",
+    ]) {
+      for (const method of [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "OPTIONS",
+      ]) {
+        const response = await fetch(
+          base + "/api/index?__afi_path=/api/v1/auth/login",
+          {
+            method: "OPTIONS",
+            headers: {
+              Origin: origin,
+              "Access-Control-Request-Method": method,
+              "Access-Control-Request-Headers":
+                "content-type,authorization,idempotency-key",
+            },
+          },
+        );
+        assert.equal(response.status, 204);
+        assert.equal(
+          response.headers.get("access-control-allow-origin"),
+          origin,
+        );
+        assert.equal(
+          response.headers.get("access-control-allow-credentials"),
+          null,
+        );
+        assert.ok(
+          (response.headers.get("access-control-allow-methods") ?? "")
+            .split(",")
+            .map((s) => s.trim())
+            .includes(method),
+        );
+        assert.match(
+          response.headers.get("access-control-allow-headers") ?? "",
+          /authorization/i,
+        );
+        assert.match(
+          response.headers.get("access-control-allow-headers") ?? "",
+          /content-type/i,
+        );
+      }
+      const invalid = await fetch(
+        base + "/api/index?__afi_path=/api/v1/auth/login",
+        {
+          method: "POST",
+          headers: { Origin: origin, "Content-Type": "application/json" },
+          body: JSON.stringify({ email: "invalid", password: "" }),
+        },
+      );
+      assert.equal(invalid.status, 400);
+      assert.equal(invalid.headers.get("access-control-allow-origin"), origin);
+      assert.equal((await invalid.json()).error.code, "VALIDATION_ERROR");
+      const missing = await fetch(
+        base + "/api/index?__afi_path=/not-an-afi-route",
+        { headers: { Origin: origin } },
+      );
+      assert.equal(missing.status, 404);
+      assert.equal(missing.headers.get("access-control-allow-origin"), origin);
+    }
+    for (const origin of [
+      "https://attacker.invalid",
+      "https://afifront-git-main-eacode.vercel.app.evil.invalid",
+      "http://localhost:5174",
+    ]) {
+      const response = await fetch(
+        base + "/api/index?__afi_path=/api/v1/auth/login",
+        {
+          method: "OPTIONS",
+          headers: { Origin: origin, "Access-Control-Request-Method": "POST" },
+        },
+      );
+      assert.equal(response.headers.get("access-control-allow-origin"), null);
+    }
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) =>

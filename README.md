@@ -5,7 +5,7 @@
 Conserva únicamente las variables de conexión y claves:
 
 ```dotenv
-FRONTEND_URL=https://afifront.vercel.app
+FRONTEND_URL=https://afifront-git-main-eacode.vercel.app
 AI_API_KEY=TU_CLAVE_IA
 SUPABASE_URL=https://TU-PROYECTO.supabase.co
 SUPABASE_ANON_KEY=TU_CLAVE_ANON
@@ -69,15 +69,32 @@ de llegar a Fastify. Revisa Deployment Protection del dominio de producción.
 Esto es independiente de los JWT de AFI, que siguen siendo obligatorios para
 los datos personales y las operaciones financieras.
 
+Después de publicar la rama `main`, comprueba el dominio de producción con:
+
+```powershell
+npm.cmd run deployment:check -- https://afiback.vercel.app
+```
+
+El comando verifica salud, preflight de los dos orígenes requeridos, métodos,
+cabeceras, rechazo de terceros y protección de una ruta financiera. También
+envía dos intentos de login con identidades aleatorias inexistentes para comprobar
+que Supabase devuelve `invalid_credentials`, no 404, y que ese error conserva
+CORS. No imprime contraseñas ni tokens, no cambia cuentas y no registra movimientos.
+Los intentos cuentan dentro del rate limit de login; no repitas el comando en bucle.
+
 La función permite servir la API y Auth en Vercel Functions. La recuperación con
 preguntas/códigos todavía requiere almacenamiento persistente; el archivo SQLite
 local no se conserva entre instancias o despliegues de Vercel. No configures una
 ruta temporal `/tmp` como sustituto de almacenamiento persistente de recuperación.
 
-CORS: `FRONTEND_URL=https://afifront.vercel.app` admite el origen de producción.
-En producción, `https://afifront.vercel.app` siempre se conserva como origen
-permitido por defecto; `FRONTEND_URL` puede añadir dominios propios adicionales.
-Así, un hostname temporal antiguo no bloquea el dominio principal.
+CORS: se permiten por defecto `https://afifront-git-main-eacode.vercel.app`
+y `http://localhost:5173`, además del dominio principal
+`https://afifront.vercel.app` en producción. `FRONTEND_URL` permite añadir
+dominios propios adicionales y conserva el origen de desarrollo configurado.
+No se permiten automáticamente todos los dominios de Vercel ni todos los puertos
+de localhost. Los métodos son GET, HEAD, POST, PUT, PATCH, DELETE y OPTIONS.
+Se admiten Content-Type, Authorization e Idempotency-Key en el preflight.
+Las sesiones usan tokens Bearer; no se habilitan credenciales de cookies CORS.
 Se normalizan dominios sin protocolo y barras finales; varios orígenes se
 separan con comas. El preflight `OPTIONS /api/v1/auth/login` debe responder 204
 con `Access-Control-Allow-Origin` para ese dominio. No se permite `*` ni se

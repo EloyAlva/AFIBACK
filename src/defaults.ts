@@ -3,6 +3,10 @@ export const defaults = {
   port: 4000,
   developmentFrontend: "http://localhost:3000",
   productionFrontend: "https://afifront.vercel.app",
+  additionalFrontendOrigins: [
+    "https://afifront-git-main-eacode.vercel.app",
+    "http://localhost:5173",
+  ],
   ai: {
     provider: "openai-compatible",
     model: "gpt-5.4-nano",

@@ -12,7 +12,8 @@
     "docs:generate": "tsx scripts/openapi.ts",
     "sql:bundle": "tsx scripts/bundle-sql.ts",
     "recovery:issue": "tsx scripts/issue-recovery-code.ts",
-    "ai:check": "tsx scripts/check-ai.ts"
+    "ai:check": "tsx scripts/check-ai.ts",
+    "deployment:check": "tsx scripts/check-deployment.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",
