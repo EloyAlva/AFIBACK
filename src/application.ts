@@ -58,12 +58,13 @@ async function all(db: SupabaseClient, table: string) {
   }
   return rows;
 }
-export async function buildApp() {
-  const app = Fastify({
-    logger: config.NODE_ENV !== "test",
-    bodyLimit: 32768,
-    requestTimeout: 30000,
-  });
+export const serverOptions = {
+  logger: config.NODE_ENV !== "test",
+  bodyLimit: 32768,
+  requestTimeout: 30000,
+};
+
+export async function buildApp(app = Fastify(serverOptions)) {
   await app.register(cors, {
     origin: config.FRONTEND_URL.split(",").map((s) => s.trim()),
     credentials: false,
@@ -127,6 +128,17 @@ export async function buildApp() {
       },
     });
   });
+  app.get(
+    "/",
+    { schema: { security: [], summary: "Información de AFIBACK" } },
+    async () => ({
+      service: "AFIBACK",
+      status: "ok",
+      health: "/health",
+      api: "/api/v1",
+      docs: "/docs",
+    }),
+  );
   app.get(
     "/health",
     {

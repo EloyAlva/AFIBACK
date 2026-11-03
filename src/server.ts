@@ -1,6 +1,8 @@
-import { buildApp } from "./app.js";
+import Fastify from "fastify";
+import { buildApp, serverOptions } from "./application.js";
 import { config } from "./config.js";
-const app = await buildApp();
+// Keep this as the only server entrypoint detected by Vercel's Fastify preset.
+const app = await buildApp(Fastify(serverOptions));
 for (const signal of ["SIGTERM", "SIGINT"])
   process.on(signal, async () => {
     await app.close();

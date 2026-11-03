@@ -1,5 +1,5 @@
 import { writeFile } from "node:fs/promises";
-import { buildApp } from "../src/app.js";
+import { buildApp } from "../src/application.js";
 const app = await buildApp();
 await app.ready();
 await writeFile(

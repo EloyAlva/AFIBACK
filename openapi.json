@@ -16,6 +16,17 @@
     "schemas": {}
   },
   "paths": {
+    "/": {
+      "get": {
+        "summary": "Información de AFIBACK",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "description": "Salud del proceso, sin secretos",

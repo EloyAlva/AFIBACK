@@ -1,5 +1,30 @@
 # AFI Backend
 
+## Rutas y despliegue en Vercel
+
+El preset se declara como `fastify` en `vercel.json`. El único punto de entrada
+es `src/server.ts`, que construye y arranca el servidor. `src/application.ts`
+contiene la fábrica utilizada por las pruebas y no es un punto de entrada.
+La raíz `/` devuelve información de AFIBACK; `/health` comprueba el proceso.
+
+En Vercel importa este repositorio como proyecto independiente, con Root Directory
+en la raíz, preset Fastify y sin un Output Directory estático personalizado como
+`dist`. Instala con `npm ci` y compila con `npm run build`. Usa Node.js 24.x.
+El frontend debe apuntar al dominio **estable de producción** del backend,
+seguido de `/api/v1`; no a la URL del panel `vercel.com/...` ni a una URL temporal
+de despliegue protegida por Vercel Authentication.
+
+Las peticiones entre proyectos necesitan un dominio accesible al navegador:
+Vercel Authentication en el backend puede redirigirlas al login de Vercel antes
+de llegar a Fastify. Revisa Deployment Protection del dominio de producción.
+Esto es independiente de los JWT de AFI, que siguen siendo obligatorios para
+los datos personales y las operaciones financieras.
+
+El preset permite servir la API y Auth en Vercel Functions. La recuperación con
+preguntas/códigos todavía requiere almacenamiento persistente; el archivo SQLite
+local no se conserva entre instancias o despliegues de Vercel. No configures una
+ruta temporal `/tmp` como sustituto de almacenamiento persistente de recuperación.
+
 ## Autenticación centralizada
 
 El frontend solo necesita `NEXT_PUBLIC_API_URL` apuntando a `/api/v1` de este servicio.
