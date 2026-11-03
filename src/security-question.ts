@@ -3,11 +3,12 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { config } from "./config.js";
 import {
-  RecoveryStore,
+  createRecoveryStore,
   recoveryAdmin,
   recoveryEmail,
   normalizeAnswer,
   type RecoveryAdmin,
+  type RecoveryVault,
 } from "./password-recovery.js";
 
 const username = z.string().min(1).max(254).transform(recoveryEmail);
@@ -53,7 +54,7 @@ const reset = z
   );
 type Identity = { id: string; email: string };
 type Options = {
-  store?: RecoveryStore;
+  store?: RecoveryVault;
   admin?: () => RecoveryAdmin;
   authorize?: (token: string, password: string) => Promise<Identity | null>;
 };
@@ -86,9 +87,9 @@ export async function registerSecurityQuestions(
   options: Options = {},
 ) {
   let store = options.store;
-  const vault = () => (store ??= new RecoveryStore());
+  const vault = () => (store ??= createRecoveryStore());
   app.addHook("onClose", async () => {
-    if (!options.store) store?.close();
+    if (!options.store) await store?.close();
   });
   const rate = { rateLimit: { max: 5, timeWindow: "15 minutes" } };
   app.post(
@@ -103,7 +104,7 @@ export async function registerSecurityQuestions(
     },
     async (req) => {
       const p = z.object({ username }).strict().parse(req.body);
-      return { question: vault().question(p.username) };
+      return { question: await vault().question(p.username) };
     },
   );
   app.post(
@@ -126,7 +127,7 @@ export async function registerSecurityQuestions(
           p.currentPassword,
         );
       else if (p.code) {
-        const uid = vault().consume(p.username, p.code);
+        const uid = await vault().consume(p.username, p.code);
         if (uid) {
           const user = await (options.admin ?? recoveryAdmin)().getUser(uid);
           if (user?.email)
@@ -186,7 +187,7 @@ export async function registerSecurityQuestions(
           { statusCode: 503 },
         );
       } finally {
-        vault().finishAnswer(p.username, verified.claim, success);
+        await vault().finishAnswer(p.username, verified.claim, success);
       }
     },
   );

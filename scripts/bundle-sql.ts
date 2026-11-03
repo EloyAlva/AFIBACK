@@ -35,8 +35,12 @@ ${migrations.map(({ file, sql }, i) => `  -- ${file}\n  execute $afi_migration_$
   end loop;
   -- Actualizacion repetible de invitaciones para instalaciones existentes.
   execute $afi_upgrade_invitations$
-${migrations.find(m => m.file === "008_registered_invitations.sql")!.sql}
+${migrations.find((m) => m.file === "008_registered_invitations.sql")!.sql}
 $afi_upgrade_invitations$;
+  -- Actualizacion repetible del almacen privado de recuperacion.
+  execute $afi_upgrade_recovery$
+${migrations.find((m) => m.file === "009_private_recovery.sql")!.sql}
+$afi_upgrade_recovery$;
  end if;
 end $afi_install$;`;
 const seed = await readFile(

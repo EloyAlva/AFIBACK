@@ -99,3 +99,27 @@ assert.equal(
   origins[0],
 );
 console.log("PASS ruta financiera sin sesión: 401 con CORS");
+
+const lookup = await request("/api/v1/auth/security-question/lookup", {
+  method: "POST",
+  headers: { Origin: origins[0], "Content-Type": "application/json" },
+  body: JSON.stringify({ username: `afi-check-${randomUUID()}` }),
+});
+assert.equal(
+  lookup.status,
+  200,
+  "La consulta de recuperación no debe fallar por almacenamiento local",
+);
+assert.deepEqual(await lookup.json(), { question: null });
+console.log(
+  "PASS recuperación persistente: consulta de usuario inexistente devuelve 200",
+);
+const logout = await request("/api/v1/auth/logout", {
+  method: "POST",
+  headers: { Origin: origins[0], Authorization: "Bearer invalid-test-token" },
+});
+assert.equal(logout.status, 200);
+assert.equal((await logout.json()).ok, true);
+console.log(
+  "PASS logout con sesión inexistente: 200, sin errores de socket o cuerpo vacío",
+);

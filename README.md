@@ -82,10 +82,10 @@ que Supabase devuelve `invalid_credentials`, no 404, y que ese error conserva
 CORS. No imprime contraseñas ni tokens, no cambia cuentas y no registra movimientos.
 Los intentos cuentan dentro del rate limit de login; no repitas el comando en bucle.
 
-La función permite servir la API y Auth en Vercel Functions. La recuperación con
-preguntas/códigos todavía requiere almacenamiento persistente; el archivo SQLite
-local no se conserva entre instancias o despliegues de Vercel. No configures una
-ruta temporal `/tmp` como sustituto de almacenamiento persistente de recuperación.
+La recuperación en Vercel/producción usa las tablas privadas de Supabase creadas
+por `supabase/migrations/009_private_recovery.sql`. Ejecuta esa migración una vez
+en instalaciones existentes. No se abre ningún archivo SQLite en Vercel ni se
+utiliza `/tmp` para guardar respuestas o códigos.
 
 CORS: se permiten por defecto `https://afifront-git-main-eacode.vercel.app`
 y `http://localhost:5173`, además del dominio principal
@@ -136,9 +136,10 @@ con comas. Las variables de IA se describen en `.env.example`.
 `DATABASE_URL` no se usa para operaciones normales: se consulta la base a través
 de Supabase. Esta actualización no requiere migraciones SQL adicionales.
 
-El servicio sigue requiriendo Node.js y almacenamiento persistente para los códigos
-y preguntas de recuperación; centralizar Auth no convierte SQLite en almacenamiento
-persistente de Vercel Functions. El frontend sí se puede alojar en Vercel.
+El servicio usa Node.js y, en producción, almacenamiento compartido de recuperación
+en Supabase. El esquema `afi_private` no es accesible por anon ni authenticated;
+las funciones RPC solo se conceden a service role. Los códigos se consumen de
+forma atómica, y los bloqueos por intentos se comparten entre instancias.
 
 API independiente en Node.js + TypeScript + Fastify. Requiere Node.js 22 o superior y un proyecto Supabase nuevo. No depende del frontend para compilar o funcionar.
 
@@ -171,12 +172,25 @@ Los correos `ealva@afi.com` y `mramirez@afi.com` pueden funcionar como identific
 El propietario del servidor emite los códigos desde esta carpeta:
 
 ```powershell
-npm.cmd run recovery:issue -- ealva mramirez
+npm.cmd run recovery:issue -- --remote ealva mramirez
 ```
 
 El comando verifica que los usuarios existan en Supabase, emite un código diferente por cuenta y lo muestra una vez en consola con su vencimiento. Entrega cada código a su propietario. No cambia contraseñas. Cada código vence en treinta minutos; emitir otro invalida los anteriores para esa cuenta. Usarlo lo consume atómicamente antes de contactar a Auth: si la operación externa falla o hace timeout, emite uno nuevo en lugar de reutilizarlo. Las pruebas utilizan Auth simulado y no actualizan cuentas reales.
 
-El almacén privado local solo guarda SHA-256, usuario, vencimiento y consumo en SQLite; no guarda contraseñas ni códigos en claro. Ubicación: `.data/password-recovery.sqlite`, ignorada por Git y Docker. Requiere Node.js >=22.13. Conserva ese directorio en un volumen persistente y ejecuta la CLI con el mismo `RECOVERY_DATABASE_PATH` que la API. Esta implementación está orientada a una única instancia Node.js: para réplicas en hosts distintos, sustituye este almacén por una base compartida con consumo atómico antes de habilitar esta recuperación. En Docker monta un volumen escribible para el usuario `node`; el archivo no se incorpora a la imagen.
+El almacén de producción solo guarda SHA-256 de los códigos y hashes scrypt con
+sal para las respuestas; nunca contraseñas, códigos ni respuestas en claro.
+`--remote` emite códigos en Supabase para que funcionen en Vercel. Sin ese flag,
+el desarrollo local conserva SQLite en `.data/password-recovery.sqlite`, ignorado
+por Git y Docker. No se necesita una variable nueva: Vercel/producción selecciona
+automáticamente el almacén compartido con las claves existentes del backend.
+
+Para conservar preguntas de una instalación local anterior, el administrador
+puede ejecutar `npm.cmd run recovery:migrate`. Solo copia hashes, sales y la
+pregunta asociada a su identidad; no sobrescribe preguntas ya existentes en
+Supabase ni importa códigos antiguos. La operación requiere autorización para
+transferir esos datos locales al proyecto remoto. Si no se importa, cada usuario
+puede configurar nuevamente su pregunta con su sesión y contraseña actual o con
+un código inicial nuevo emitido con `--remote`.
 
 La service role permanece en el servidor, sin endpoint público de emisión. El usuario elige su contraseña en el navegador y solo se envía al backend para completar esta operación específica de Auth. Las cuentas y movimientos financieros siguen protegidos por sus permisos y RLS originales. Referencia: [Supabase Admin updateUserById](https://supabase.com/docs/reference/javascript/auth-admin-updateuserbyid).
 
@@ -186,7 +200,7 @@ La service role permanece en el servidor, sin endpoint público de emisión. El 
 
 Abre [`supabase/afi_instalacion_completa.sql`](supabase/afi_instalacion_completa.sql) y ejecuta el archivo completo en Supabase SQL Editor con rol `postgres`, sin reemplazar contraseñas. Para cada usuario nuevo genera una contraseña aleatoria de 36 caracteres y la devuelve en la columna `contrasena_inicial` del resultado final. Copia esas contraseñas al terminar: solo se muestran durante la creación. Si prefieres establecer una propia, sustituye su `null` inicial por un literal SQL de al menos 12 caracteres y como máximo 72 bytes.
 
-El archivo incluye las siete migraciones para una instalación nueva. Si AFI ya está instalado, comprueba que estén las tablas y RLS y conserva el esquema y los datos existentes. Una instalación parcial se detiene y señala que hay que aplicar las migraciones pendientes. Todo se ejecuta en una sola transacción.
+El archivo incluye las nueve migraciones para una instalación nueva. Si AFI ya está instalado, comprueba las tablas y RLS existentes y aplica también las migraciones 008 y 009, conservando los datos financieros. Una instalación parcial se detiene y señala que hay que aplicar las migraciones pendientes. Todo se ejecuta en una sola transacción.
 
 Se crean estos usuarios nuevos con correo confirmado, hash bcrypt e identidad de proveedor email:
 
@@ -283,7 +297,7 @@ npm.cmd start
 
 Las pruebas de base usan PGlite con pgcrypto, migraciones íntegras y roles anon/authenticated/service_role. Prueban RLS, propiedad de claves foráneas, idempotencia, reversión atómica, pagos parciales, recurrencias bisiestas, cuotas exactas, fondo, distribución, reasignaciones, invitaciones, roles, confirmación y cuotas de IA. Auth se simula con claims; aún se debe validar JWT/correos contra Supabase real. PGlite usa una sola conexión; se necesita una prueba multi-conexión en staging para medir contención y carreras reales.
 
-Despliega este repositorio por separado en un servicio Node.js persistente: `npm ci`, `npm run build`, `npm start`, salud `/health`, puerto `$PORT`. Configura las variables como secretos en el proveedor y `FRONTEND_URL` con el dominio Vercel. Usa HTTPS, backups Supabase y conserva los logs estructurados. No publiques `.env`.
+Vercel utiliza la función `api/index.ts` y la configuración incluida en `vercel.json`. También puedes desplegar en un servicio Node.js: `npm ci`, `npm run build`, `npm start`, salud `/health`, puerto `$PORT`. La recuperación en producción se guarda en Supabase mediante la migración 009. Configura las variables como secretos en el proveedor y `FRONTEND_URL` con el dominio del frontend. Usa HTTPS, backups Supabase y conserva los logs estructurados. No publiques `.env`.
 
 Incluye Dockerfile opcional. La imagen requiere que la plataforma inyecte variables al arrancar; no incorpora secretos.
 

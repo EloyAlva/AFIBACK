@@ -12,6 +12,7 @@
     "docs:generate": "tsx scripts/openapi.ts",
     "sql:bundle": "tsx scripts/bundle-sql.ts",
     "recovery:issue": "tsx scripts/issue-recovery-code.ts",
+    "recovery:migrate": "tsx scripts/migrate-recovery.ts",
     "ai:check": "tsx scripts/check-ai.ts",
     "deployment:check": "tsx scripts/check-deployment.ts"
   },

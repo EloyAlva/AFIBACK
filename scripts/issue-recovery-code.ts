@@ -1,9 +1,13 @@
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
-import { RecoveryStore, recoveryEmail } from "../src/password-recovery.js";
+import {
+  createRecoveryStore,
+  recoveryEmail,
+} from "../src/password-recovery.js";
 import { config } from "../src/config.js";
 
-const usernames = process.argv.slice(2);
+const remote = process.argv.includes("--remote");
+const usernames = process.argv.slice(2).filter((value) => value !== "--remote");
 if (!usernames.length)
   throw Error("Uso: npm run recovery:issue -- ealva mramirez");
 if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !config.SUPABASE_URL)
@@ -27,14 +31,14 @@ if (emails.some((email) => !found.has(email)))
   throw Error(
     "Algún usuario solicitado no existe en Supabase. No se emitieron códigos.",
   );
-const store = new RecoveryStore();
+const store = createRecoveryStore(remote || undefined);
 try {
   for (const email of emails) {
-    const result = store.issue(found.get(email)!, email);
+    const result = await store.issue(found.get(email)!, email);
     process.stdout.write(
       JSON.stringify({ username: email.split("@")[0], ...result }) + "\n",
     );
   }
 } finally {
-  store.close();
+  await store.close();
 }

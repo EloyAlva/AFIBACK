@@ -1,4 +1,4 @@
-import { randomBytes, createHash, scrypt, timingSafeEqual } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -6,6 +6,43 @@ import type { FastifyInstance } from "fastify";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { config } from "./config.js";
+import { answerHash, codeHash } from "./recovery-crypto.js";
+import { SupabaseRecoveryStore } from "./supabase-recovery.js";
+export { normalizeAnswer } from "./recovery-crypto.js";
+
+type Awaitable<T> = T | Promise<T>;
+export interface RecoveryVault {
+  issue(
+    userId: string,
+    email: string,
+    now?: number,
+  ): Awaitable<{ code: string; expiresAt: string }>;
+  consume(email: string, code: string, now?: number): Awaitable<string | null>;
+  question(email: string): Awaitable<string | null>;
+  setQuestion(
+    userId: string,
+    email: string,
+    question: string,
+    answer: string,
+  ): Promise<void>;
+  verifyAnswer(
+    email: string,
+    answer: string,
+    now?: number,
+  ): Promise<{ userId: string; claim: string } | null>;
+  finishAnswer(
+    email: string,
+    claim: string,
+    success: boolean,
+    now?: number,
+  ): Awaitable<void>;
+  close(): Awaitable<void>;
+}
+export function createRecoveryStore(
+  remote = process.env.VERCEL === "1" || config.NODE_ENV === "production",
+): RecoveryVault {
+  return remote ? new SupabaseRecoveryStore() : new RecoveryStore();
+}
 
 export function recoveryEmail(username: string) {
   const value = username.trim().toLowerCase();
@@ -152,27 +189,8 @@ export class RecoveryStore {
       );
   }
   private hash(code: string) {
-    return createHash("sha256").update(code).digest("hex");
+    return codeHash(code);
   }
-}
-
-export function normalizeAnswer(answer: string) {
-  return answer
-    .normalize("NFKC")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLocaleLowerCase("es");
-}
-function answerHash(answer: string, salt: string): Promise<Buffer> {
-  return new Promise((resolve, reject) =>
-    scrypt(
-      normalizeAnswer(answer),
-      salt,
-      32,
-      { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 },
-      (error, key) => (error ? reject(error) : resolve(key)),
-    ),
-  );
 }
 
 export type RecoveryAdmin = {
@@ -208,11 +226,11 @@ export function recoveryAdmin(): RecoveryAdmin {
 
 export async function registerPasswordRecovery(
   app: FastifyInstance,
-  options: { store?: RecoveryStore; admin?: () => RecoveryAdmin } = {},
+  options: { store?: RecoveryVault; admin?: () => RecoveryAdmin } = {},
 ) {
   let store = options.store;
   app.addHook("onClose", async () => {
-    if (!options.store) store?.close();
+    if (!options.store) await store?.close();
   });
   app.post(
     "/api/v1/auth/password-recovery",
@@ -238,8 +256,8 @@ export async function registerPasswordRecovery(
     async (req) => {
       const p = passwordRecoverySchema.parse(req.body);
       const admin = (options.admin ?? recoveryAdmin)();
-      store ??= new RecoveryStore();
-      const userId = store.consume(p.username, p.code);
+      store ??= createRecoveryStore();
+      const userId = await store.consume(p.username, p.code);
       const invalid = () =>
         Object.assign(
           new Error(
