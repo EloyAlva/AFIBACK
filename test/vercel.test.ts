@@ -25,7 +25,7 @@ test("Los POST vacíos de Vercel no requieren un stream de lectura", async () =>
         "content-length": "0",
         origin: config.FRONTEND_URL.split(",")[0],
       },
-      socket: { remoteAddress: "127.0.0.1" },
+      socket: null,
     };
     void handler(parsed as any, res);
   });

@@ -80,7 +80,7 @@ export default async function handler(
       url: requestUrl(req.url ?? "/"),
       headers,
       payload: body,
-      remoteAddress: req.socket.remoteAddress ?? "127.0.0.1",
+      remoteAddress: req.socket?.remoteAddress ?? "127.0.0.1",
     });
     res.statusCode = result.statusCode;
     for (const [name, value] of Object.entries(result.headers))
