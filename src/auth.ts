@@ -197,7 +197,19 @@ export async function registerAuth(
         return { session: sessionSummary({ ...p, user, expires_at: expiry }) };
       });
       routes.post("/logout", async (req) => {
-        await request("/logout?scope=local", "POST", undefined, bearer(req));
+        const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
+        if (!token) return { ok: true };
+        try {
+          await request("/logout?scope=local", "POST", undefined, token);
+        } catch (error) {
+          // Match Supabase signOut: expired/missing sessions are already signed out.
+          if (
+            ![401, 403, 404].includes(
+              (error as { statusCode?: number }).statusCode ?? 0,
+            )
+          )
+            throw error;
+        }
         return { ok: true };
       });
       routes.post(

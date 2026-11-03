@@ -16,6 +16,37 @@ test("La reescritura conserva rutas y filtros sin filtrar el parámetro interno"
   assert.throws(() => requestUrl("/api/index?__afi_path=//attacker.invalid"));
 });
 
+test("Los POST vacíos de Vercel no requieren un stream de lectura", async () => {
+  const server = createServer((req, res) => {
+    const parsed = {
+      method: "POST",
+      url: "/api/index?__afi_path=/api/v1/auth/logout",
+      headers: {
+        "content-length": "0",
+        origin: config.FRONTEND_URL.split(",")[0],
+      },
+      socket: { remoteAddress: "127.0.0.1" },
+    };
+    void handler(parsed as any, res);
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  try {
+    const result = await fetch(`http://127.0.0.1:${address.port}/`, {
+      method: "POST",
+    });
+    assert.equal(result.status, 200);
+    assert.equal((await result.json()).ok, true);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
+});
+
 test("La función Vercel responde salud y preflight sin abrir un puerto de Fastify", async () => {
   const server = createServer((req, res) => {
     void handler(req, res);

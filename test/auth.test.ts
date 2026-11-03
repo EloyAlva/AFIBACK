@@ -53,6 +53,49 @@ async function setup(
 }
 const ok = (body: unknown) => Response.json(body);
 
+test("Logout es idempotente para sesiones vencidas y conserva fallos reales del proveedor", async () => {
+  let providerStatus = 403,
+    calls = 0;
+  const app = await setup(() => {
+    calls++;
+    return Response.json(
+      { error_code: "session_not_found", msg: "Session not found" },
+      { status: providerStatus },
+    );
+  });
+  try {
+    const empty = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/logout",
+    });
+    assert.equal(empty.statusCode, 200);
+    assert.equal(calls, 0);
+    for (const status of [401, 403, 404]) {
+      providerStatus = status;
+      const result = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/logout",
+        headers: { authorization: "Bearer expired-test" },
+      });
+      assert.equal(result.statusCode, 200);
+      assert.equal(result.json().ok, true);
+    }
+    providerStatus = 500;
+    assert.equal(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/v1/auth/logout",
+          headers: { authorization: "Bearer expired-test" },
+        })
+      ).statusCode,
+      503,
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("Auth: login y renovación pasan por backend sin filtrar claves ni metadatos privados", async () => {
   let calls = 0;
   const app = await setup((path, method, body) => {

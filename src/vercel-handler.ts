@@ -43,6 +43,13 @@ async function payload(req: IncomingMessage & { body?: unknown }) {
       });
     return value;
   }
+  // Vercel may provide a parsed request without a readable stream for empty POSTs.
+  // Logout and notification refresh have no body; do not try to iterate that stream.
+  if (
+    !req.headers["transfer-encoding"] &&
+    (!req.headers["content-length"] || req.headers["content-length"] === "0")
+  )
+    return undefined;
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const part of req) {
