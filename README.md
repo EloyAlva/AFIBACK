@@ -1,5 +1,37 @@
 # AFI Backend
 
+## Variables mínimas en Vercel
+
+Conserva únicamente las variables de conexión y claves:
+
+```dotenv
+FRONTEND_URL=https://afifront.vercel.app
+AI_API_KEY=TU_CLAVE_IA
+SUPABASE_URL=https://TU-PROYECTO.supabase.co
+SUPABASE_ANON_KEY=TU_CLAVE_ANON
+SUPABASE_SERVICE_ROLE_KEY=TU_CLAVE_SERVICE_ROLE
+DATABASE_URL=TU_CONEXION_OPCIONAL
+```
+
+`DATABASE_URL` se puede conservar, pero la API actual consulta a través de Supabase
+y no la utiliza. Ninguna clave se incluye en el código.
+Los demás valores están en [`src/defaults.ts`](src/defaults.ts): se mantiene el
+modelo `gpt-5.4-nano`, el endpoint OpenAI, timeout de 15 segundos, presupuesto
+mensual de USD 5 y límite mensual de 100 consultas por usuario, además de los
+límites de tokens. Los precios de entrada/salida por millón son USD 0.20/1.25,
+verificados en [OpenAI Docs](https://developers.openai.com/api/docs/models/gpt-5.4-nano).
+
+La IA se activa al configurar `AI_API_KEY`. Sin clave queda desactivada.
+No necesitas definir `AI_ENABLED`, modelo, precios, presupuesto, `PORT` ni
+`NODE_ENV`. Vercel determina el entorno de producción. Después de actualizar,
+elimina las variables opcionales antiguas si quieres usar los defaults y haz
+Redeploy. Un `AI_ENABLED=false` explícito sigue desactivando la IA.
+
+Se admiten overrides opcionales para instalaciones personalizadas. Los campos
+opcionales vacíos usan defaults; los límites numéricos explícitos de cero se
+conservan. Si cambias modelo o proveedor, debes indicar sus precios: nunca se
+aplican automáticamente los precios de este modelo a otro distinto.
+
 ## Rutas y despliegue en Vercel
 
 Compatibilidad de dependencias: `@fastify/static` usa `require()` para cargar
@@ -194,7 +226,7 @@ Errores: `{ "error": { "code":"...", "message":"...", "requestId":"...", "detail
 
 Prueba operativa para el administrador: `npm run ai:check -- ealva`. Verifica una interpretación sintética, reserva presupuesto y contabiliza una interacción en ese usuario. No inicia sesión como él, no consulta sus cuentas ni crea movimientos financieros. Requiere IA habilitada, configuración completa y acceso a Supabase/OpenAI. El resultado muestra modelo, tokens y costo estimado sin exponer claves.
 
-Con `AI_ENABLED=false` no hay llamadas a proveedores. Para habilitarla completa key, modelo, URL, timeout y los **precios reales** del modelo (`AI_INPUT_USD_PER_MILLION`, `AI_OUTPUT_USD_PER_MILLION`). No se codifican precios supuestos. Falta de configuración o de cuota mantiene disponible el registro manual.
+Con `AI_ENABLED=false` no hay llamadas a proveedores. En la configuración mínima basta `AI_API_KEY`: modelo, URL, timeout y precios verificados se leen de `src/defaults.ts`. Solo al cambiar modelo o endpoint debes configurar sus **precios reales** (`AI_INPUT_USD_PER_MILLION`, `AI_OUTPUT_USD_PER_MILLION`). Falta de configuración o de cuota mantiene disponible el registro manual.
 
 El proveedor inicial utiliza Chat Completions con salida textual JSON validada por Zod. No exige tools ni `response_format` al proveedor. `AI_TOKEN_PARAMETER` selecciona `max_completion_tokens` (predeterminado) o `max_tokens` para proveedores con el contrato anterior. La interfaz `AIProvider` permite adaptar otro protocolo. Un modelo que no admita Chat Completions requiere un adaptador; no se declara compatibilidad universal. Contrato revisado con [OpenAI Docs](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
 

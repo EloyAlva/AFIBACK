@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CompatibleProvider, interpret } from "../src/ai.js";
+import { config } from "../src/config.js";
 test("Proveedor desacoplado valida JSON y no envía herramientas de escritura", async () => {
   const original = globalThis.fetch;
   let request: any;
@@ -50,7 +51,7 @@ test("Proveedor desacoplado valida JSON y no envía herramientas de escritura", 
   }
 });
 test("IA desactivada falla antes de consultar datos o llamar al proveedor", async () => {
-  if (process.env.AI_ENABLED === "true") return;
+  if (config.AI_ENABLED) return;
   await assert.rejects(
     interpret({} as any, "user", "key", "Hola"),
     /IA desactivada/,
