@@ -25,6 +25,7 @@ import { draftSchema, interpret } from "./ai.js";
 import { registerPasswordRecovery } from "./password-recovery.js";
 import { registerSecurityQuestions } from "./security-question.js";
 import { registerAuth } from "./auth.js";
+import { registerPlanner } from "./planner-routes.js";
 declare module "fastify" {
   interface FastifyRequest {
     db: SupabaseClient;
@@ -277,6 +278,8 @@ export async function buildApp(app = Fastify(serverOptions)) {
               ].includes(resource)
             )
               query = query.order("due_date").order("id");
+            else if (resource === "planner-budgets")
+              query = query.order("month").order("currency");
             else if (
               !["members", "goal-members", "profile", "preferences"].includes(
                 resource,
@@ -480,14 +483,30 @@ export async function buildApp(app = Fastify(serverOptions)) {
             "occurrences",
             "budgets",
             "goals",
+            "goal-members",
             "allocations",
             "plans",
             "fund-movements",
             "categories",
             "preferences",
+            "planner-budgets",
           ];
           const entries = await Promise.all(
-            names.map(async (n) => [n, await all(req.db, tables[n])] as const),
+            names.map(
+              async (n) =>
+                [
+                  n,
+                  await all(req.db, tables[n]).catch((error) => {
+                    // Keep the existing dashboard available while migration 012 is applied.
+                    if (
+                      n === "planner-budgets" &&
+                      ["PGRST205", "42P01"].includes(error.code)
+                    )
+                      return [];
+                    throw error;
+                  }),
+                ] as const,
+            ),
           );
           return summarize(
             Object.fromEntries(entries),
@@ -498,6 +517,7 @@ export async function buildApp(app = Fastify(serverOptions)) {
           );
         },
       );
+      registerPlanner(api);
       api.post(
         "/allocations",
         {

@@ -1,5 +1,9 @@
 # AFI Backend
 
+## Planificador financiero por espacios y objetivos
+
+Aplica `supabase/migrations/012_financial_planner.sql` después de las anteriores. Añade presupuestos privados, fecha de inicio de objetivos, autorización explícita y revocable de compartir planes, auditoría y límites de aportes. Los planes anteriores se vuelven privados de forma predeterminada. El nuevo motor y su algoritmo por restricciones de vencimiento se documentan en [PLANNER.md](PLANNER.md), con rutas, fórmulas, supuestos, límites y pruebas. No utiliza IA ni registra movimientos financieros automáticamente.
+
 ## Meta mensual de ahorro
 
 En instalaciones existentes, aplica `supabase/migrations/011_savings_target.sql`. Añade `user_preferences.savings_target_percentage` (20% predeterminado, configurable entre 0% y 100%) y actualiza `update_profile` conservando las preferencias anteriores cuando no se envía el nuevo campo. `PUT /api/v1/profile` admite el campo opcional `savings_target_percentage`.

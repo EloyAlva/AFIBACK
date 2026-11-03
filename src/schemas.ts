@@ -109,6 +109,7 @@ export const resources = {
       ideal_amount: money,
       currency: currency.default("PEN"),
       target_date: date,
+      start_date: date.optional(),
       priority: z.coerce.number().int().min(1).max(3).default(2),
     })
     .strict()
@@ -141,6 +142,7 @@ export const tables: Record<string, string> = {
   notifications: "notifications",
   profile: "profiles",
   preferences: "user_preferences",
+  "planner-budgets": "savings_planner_budgets",
   "ai-usage": "ai_usage_logs",
 };
 export const purchase = z
@@ -212,6 +214,7 @@ export const updates: Record<string, z.ZodType> = {
       minimum_amount: money.or(z.literal(0)).optional(),
       ideal_amount: money.optional(),
       target_date: date.optional(),
+      start_date: date.optional(),
       priority: z.number().int().min(1).max(3).optional(),
     })
     .strict(),

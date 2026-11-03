@@ -52,6 +52,42 @@ test("Migraciones completas, RLS y operaciones atómicas en PostgreSQL", async (
     const create = (resource: string, p: unknown) =>
       rpc("create_resource", [resource, JSON.stringify(p)]);
     await login(u);
+    await t.test("Planificador: presupuestos privados, planes propios y autorización revocable de compartir", async () => {
+      const s = await create("spaces", { name: "Privacidad del plan" });
+      const g = await create("goals", { space_id: s, name: "Compartido", minimum_amount: 0, ideal_amount: 1000, currency: "PEN", start_date: "2026-01-01", target_date: "2028-01-01", priority: 2 });
+      await db.exec("reset role");
+      await db.query("insert into public.shared_space_members(space_id,user_id,role) values($1,$2,'member')", [s, v]);
+      await login(u);
+      await rpc("save_planner_budget", [JSON.stringify({ currency: "PEN", month: "2027-01-01", monthly_income: 3000, savings_percentage: 20, maximum_savings: 600, essential_expenses: 1000 })]);
+      await rpc("save_savings_plans", [JSON.stringify([{ goal_id: g, month: "2027-01-01", amount: 400, share_authorized: false }])]);
+      await login(v);
+      assert.equal((await db.query("select * from public.savings_planner_budgets")).rows.length, 0);
+      await rpc("save_planner_budget", [JSON.stringify({ currency: "PEN", month: "2027-01-01", monthly_income: 4043, savings_percentage: 10, maximum_savings: 400, essential_expenses: 1000 })]);
+      assert.equal((await db.query("select * from public.savings_plans where goal_id=$1", [g])).rows.length, 0);
+      await assert.rejects(db.query("update public.savings_plans set amount=999 where goal_id=$1", [g]));
+      await rpc("save_savings_plans", [JSON.stringify([{ goal_id: g, month: "2027-01-01", amount: 100, share_authorized: true }])]);
+      await assert.rejects(rpc("update_resource", ["goals", g, JSON.stringify({ start_date: "2025-01-01" })]), /Forbidden/);
+      await login(u);
+      assert.equal(Number((await db.query<any>("select monthly_income from public.savings_planner_budgets")).rows[0].monthly_income), 3000);
+      let visible = (await db.query<any>("select * from public.savings_plans where goal_id=$1 order by amount", [g])).rows;
+      assert.deepEqual(visible.map((r) => Number(r.amount)), [100, 400]);
+      await rpc("save_savings_plans", [JSON.stringify([{ goal_id: g, month: "2027-01-01", amount: 400, share_authorized: true }])]);
+      await login(v);
+      assert.equal((await db.query("select * from public.savings_plans where goal_id=$1", [g])).rows.length, 2);
+      await login(u);
+      await rpc("save_savings_plans", [JSON.stringify([{ goal_id: g, month: "2027-01-01", amount: 400, share_authorized: false }])]);
+      await login(v);
+      assert.equal((await db.query("select * from public.savings_plans where goal_id=$1", [g])).rows.length, 1);
+      await login(u);
+      assert.ok((await db.query("select * from public.audit_logs where entity='savings_plan'")).rows.length > 0);
+      await db.exec("reset role");
+      await db.query("delete from public.savings_plans where goal_id=$1", [g]);
+      await db.query("delete from public.savings_goals where id=$1", [g]);
+      await db.query("delete from public.shared_space_members where space_id=$1", [s]);
+      await db.query("delete from public.shared_spaces where id=$1", [s]);
+      await db.query("delete from public.savings_planner_budgets where user_id in ($1,$2)", [u,v]);
+      await login(u);
+    });
     await t.test("La meta porcentual de ahorro se guarda solo para el usuario actual", async () => {
       await rpc("update_profile", [JSON.stringify({ display_name: "Uno", currency: "PEN", timezone: "America/Lima", ant_expense_threshold: 20, savings_target_percentage: 25 })]);
       assert.equal(Number((await db.query<any>("select savings_target_percentage from public.user_preferences")).rows[0].savings_target_percentage), 25);
@@ -373,6 +409,13 @@ test("Migraciones completas, RLS y operaciones atómicas en PostgreSQL", async (
           rpc("allocate_savings", [goal, 101, randomUUID()]),
         );
         await assert.rejects(rpc("void_transaction", [reserve]));
+        const small = await create("goals", { name: "Meta completa", minimum_amount: 0, ideal_amount: 1, currency: "PEN", target_date: "2028-01-01", priority: 2 });
+        const allocationKey = randomUUID();
+        const allocationId = await rpc("allocate_savings", [small, 1, allocationKey]);
+        assert.equal(await rpc("allocate_savings", [small, 1, allocationKey]), allocationId);
+        await assert.rejects(rpc("allocate_savings", [small, 0.01, randomUUID()]), /saldo pendiente/);
+        assert.equal(Number((await db.query<any>("select sum(amount) as total from public.savings_allocations where goal_id=$1", [small])).rows[0].total), 1);
+        await rpc("allocate_savings", [small, -1, randomUUID()]);
         await rpc("allocate_savings", [goal, -100, randomUUID()]);
         await rpc("void_transaction", [reserve]);
       },

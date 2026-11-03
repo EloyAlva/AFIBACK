@@ -1,5 +1,6 @@
 import { Decimal } from "decimal.js";
 import { DateTime } from "luxon";
+import { responsibilityTargets } from "./goal-shares.js";
 export type Row = Record<string, any>;
 export const sum = (rows: Row[], field = "amount"): Decimal =>
   rows.reduce<Decimal>((a, r) => a.plus(r[field] ?? 0), new Decimal(0));
@@ -99,10 +100,21 @@ export function summarize(
     ),
   );
   const monthlySaved = sum(
-    (data["fund-movements"] ?? []).filter((f) =>
-      f.user_id === userId && f.currency === currency && period.some((t) => t.id === f.transaction_id)),
+    (data["fund-movements"] ?? []).filter(
+      (f) =>
+        f.user_id === userId &&
+        f.currency === currency &&
+        period.some((t) => t.id === f.transaction_id),
+    ),
   );
-  const savingsTargetPercentage = Number(data.preferences?.[0]?.savings_target_percentage ?? 20);
+  const monthlySettings = (data["planner-budgets"] ?? [])
+    .filter((b) => b.currency === currency && b.month.slice(0, 7) <= month)
+    .sort((a, b) => b.month.localeCompare(a.month))[0];
+  const savingsTargetPercentage = Number(
+    monthlySettings?.savings_percentage ??
+      data.preferences?.[0]?.savings_target_percentage ??
+      20,
+  );
   const savingsTarget = income.times(savingsTargetPercentage).div(100);
   const savingsShortfall = Decimal.max(0, savingsTarget.minus(monthlySaved));
   const occurrences = (data.occurrences ?? [])
@@ -222,6 +234,10 @@ export function summarize(
       );
       return {
         ...g,
+        participantTargets: responsibilityTargets(
+          g.ideal_amount,
+          (data["goal-members"] ?? []).filter((m) => m.goal_id === g.id),
+        ),
         confirmed: confirmed.toNumber(),
         planned: sum(
           (data.plans ?? []).filter(
@@ -301,10 +317,18 @@ export function summarize(
       targetPercentage: savingsTargetPercentage,
       target: savingsTarget.toNumber(),
       saved: monthlySaved.toNumber(),
-      actualPercentage: income.gt(0) ? monthlySaved.div(income).times(100).toNumber() : null,
+      actualPercentage: income.gt(0)
+        ? monthlySaved.div(income).times(100).toNumber()
+        : null,
       shortfall: savingsShortfall.toNumber(),
-      progress: savingsTarget.gt(0) ? Decimal.max(0, monthlySaved.div(savingsTarget).times(100)).toNumber() : null,
-      status: income.isZero() ? "no_income" : savingsShortfall.gt(0) ? "behind" : "on_track",
+      progress: savingsTarget.gt(0)
+        ? Decimal.max(0, monthlySaved.div(savingsTarget).times(100)).toNumber()
+        : null,
+      status: income.isZero()
+        ? "no_income"
+        : savingsShortfall.gt(0)
+          ? "behind"
+          : "on_track",
     },
     expense: spent.toNumber(),
     balance: income.minus(spent).toNumber(),
