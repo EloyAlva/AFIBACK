@@ -67,6 +67,7 @@ export const serverOptions = {
 export async function buildApp(app = Fastify(serverOptions)) {
   await app.register(cors, {
     origin: config.FRONTEND_URL.split(",").map((s) => s.trim()),
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "OPTIONS"],
     credentials: false,
   });
   await app.register(helmet);

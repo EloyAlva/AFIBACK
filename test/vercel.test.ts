@@ -47,6 +47,32 @@ test("La función Vercel responde salud y preflight sin abrir un puerto de Fasti
       preflight.headers.get("access-control-allow-methods") ?? "",
       /POST/,
     );
+    for (const method of ["PUT", "PATCH"]) {
+      const edit = await fetch(
+        base + "/api/index?__afi_path=/api/v1/auth/password",
+        {
+          method: "OPTIONS",
+          headers: {
+            Origin: origin,
+            "Access-Control-Request-Method": method,
+            "Access-Control-Request-Headers":
+              "authorization,content-type,idempotency-key",
+          },
+        },
+      );
+      assert.equal(edit.status, 204);
+      assert.equal(edit.headers.get("access-control-allow-origin"), origin);
+      assert.ok(
+        (edit.headers.get("access-control-allow-methods") ?? "")
+          .split(",")
+          .map(value=>value.trim())
+          .includes(method),
+      );
+      assert.match(
+        edit.headers.get("access-control-allow-headers") ?? "",
+        /idempotency-key/i,
+      );
+    }
     assert.match(
       preflight.headers.get("access-control-allow-headers") ?? "",
       /content-type/i,
