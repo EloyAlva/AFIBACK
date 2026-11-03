@@ -98,3 +98,16 @@ test("Vercel usa producción sin configurar NODE_ENV ni el puerto", () => {
   assert.equal(production.FRONTEND_URL, "https://afifront.vercel.app");
   assert.equal(parseConfig({}).FRONTEND_URL, "http://localhost:3000");
 });
+
+test("El dominio principal sigue permitido en Vercel con una URL temporal configurada", () => {
+  const configured = parseConfig({
+    ...minimal,
+    VERCEL: "1",
+    FRONTEND_URL: "https://old-preview.example/",
+  });
+  assert.deepEqual(configured.FRONTEND_URL.split(","), [
+    "https://afifront.vercel.app",
+    "https://old-preview.example",
+  ]);
+  assert.ok(!configured.FRONTEND_URL.includes("*"));
+});

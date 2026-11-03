@@ -75,6 +75,9 @@ local no se conserva entre instancias o despliegues de Vercel. No configures una
 ruta temporal `/tmp` como sustituto de almacenamiento persistente de recuperación.
 
 CORS: `FRONTEND_URL=https://afifront.vercel.app` admite el origen de producción.
+En producción, `https://afifront.vercel.app` siempre se conserva como origen
+permitido por defecto; `FRONTEND_URL` puede añadir dominios propios adicionales.
+Así, un hostname temporal antiguo no bloquea el dominio principal.
 Se normalizan dominios sin protocolo y barras finales; varios orígenes se
 separan con comas. El preflight `OPTIONS /api/v1/auth/login` debe responder 204
 con `Access-Control-Allow-Origin` para ese dominio. No se permite `*` ni se
