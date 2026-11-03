@@ -35,6 +35,9 @@
     "typescript": "^5.9.0"
   },
   "overrides": {
+    "light-my-request": {
+      "cookie": "1.1.1"
+    },
     "@fastify/static": {
       "content-disposition": "2.0.1"
     },

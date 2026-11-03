@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-test("Swagger y Static cargan por CommonJS sin depender de require(ESM)", () => {
+test("Fastify, cookies y Swagger funcionan sin require(ESM)", () => {
   const disableEsm = process.allowedNodeEnvironmentFlags.has(
     "--no-require-module",
   )
@@ -26,7 +26,20 @@ test("Swagger y Static cargan por CommonJS sin depender de require(ESM)", () => 
    assert.equal(header.parameters.filename,'AFI.pdf');
    fromSwagger('@fastify/static');
    require('@fastify/swagger-ui');
-   console.log('CommonJS runtime OK');
+   (async()=>{
+     const app=require('fastify')();
+     app.get('/runtime-check',(request,reply)=>{
+       assert.equal(request.headers.cookie,'afi=test');
+       return reply.header('set-cookie','afi=updated; Path=/; HttpOnly').send({ok:true});
+     });
+     try{
+       const response=await app.inject({url:'/runtime-check',cookies:{afi:'test'}});
+       assert.equal(response.statusCode,200);
+       assert.equal(response.json().ok,true);
+       assert.equal(response.cookies[0].value,'updated');
+       console.log('CommonJS runtime OK');
+     }finally{await app.close()}
+   })().catch(error=>{console.error(error);process.exitCode=1});
  `,
     ],
     {

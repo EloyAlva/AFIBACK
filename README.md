@@ -41,6 +41,12 @@ La versión 3 es ESM y puede provocar `ERR_REQUIRE_ESM` en el cargador de Vercel
 No elimines el override sin ejecutar la prueba de compatibilidad del runtime.
 El archivo lock debe instalarse con `npm ci` en cada despliegue.
 
+También se fija `cookie` a `1.1.1` dentro de `light-my-request`: conserva la API
+`stringifySetCookie` y permite cargarla desde CommonJS. `cookie` 2 es ESM y el
+cargador de Vercel puede rechazar su `require()`. La prueba de runtime ejecuta
+una petición completa de Fastify con cookies y Swagger sin `require(ESM)`, no
+solo la importación de los plugins.
+
 Vercel utiliza la función HTTP `api/index.ts`, que reutiliza la aplicación
 Fastify mediante `src/vercel-handler.ts` sin llamar a `listen()` ni abrir un
 puerto. Las reescrituras conservan la ruta y los filtros de cada petición.
