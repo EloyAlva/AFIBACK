@@ -19,7 +19,7 @@
     "@fastify/helmet": "^13.0.0",
     "@fastify/rate-limit": "^10.3.0",
     "@fastify/swagger": "^9.5.0",
-    "@fastify/swagger-ui": "^6.1.2",
+    "@fastify/swagger-ui": "6.1.2",
     "@supabase/supabase-js": "^2.57.0",
     "decimal.js": "^10.6.0",
     "dotenv": "^17.2.0",
@@ -35,6 +35,9 @@
     "typescript": "^5.9.0"
   },
   "overrides": {
+    "@fastify/static": {
+      "content-disposition": "2.0.1"
+    },
     "glob": "^14.0.2",
     "minimatch": "^11.0.1"
   },

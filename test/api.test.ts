@@ -44,6 +44,12 @@ test("Salud, CORS, OpenAPI y protección de rutas", async () => {
     assert.equal(schema.statusCode, 200);
     assert.ok(schema.json().paths["/api/v1/transactions"]);
     assert.ok(schema.json().components.securitySchemes.bearerAuth);
+    const docs = await app.inject("/docs/");
+    assert.equal(docs.statusCode, 200);
+    assert.match(docs.headers["content-type"] ?? "", /text\/html/);
+    const stylesheet = await app.inject("/docs/static/swagger-ui.css");
+    assert.equal(stylesheet.statusCode, 200);
+    assert.match(stylesheet.headers["content-type"] ?? "", /text\/css/);
     const cors = await app.inject({
       method: "OPTIONS",
       url: "/api/v1/accounts",

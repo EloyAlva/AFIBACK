@@ -2,6 +2,13 @@
 
 ## Rutas y despliegue en Vercel
 
+Compatibilidad de dependencias: `@fastify/static` usa `require()` para cargar
+`content-disposition`. Se fija esa dependencia transitiva a `2.0.1` (CommonJS,
+con la API `create`), conservando Swagger UI 6.1.2 y Static 10.1.8.
+La versión 3 es ESM y puede provocar `ERR_REQUIRE_ESM` en el cargador de Vercel.
+No elimines el override sin ejecutar la prueba de compatibilidad del runtime.
+El archivo lock debe instalarse con `npm ci` en cada despliegue.
+
 El preset se declara como `fastify` en `vercel.json`. El único punto de entrada
 es `src/server.ts`, que construye y arranca el servidor. `src/application.ts`
 contiene la fábrica utilizada por las pruebas y no es un punto de entrada.
