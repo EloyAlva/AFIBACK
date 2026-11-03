@@ -11,6 +11,23 @@ const minimal = {
   SUPABASE_ANON_KEY: "test-anon",
   SUPABASE_SERVICE_ROLE_KEY: "test-service",
 };
+test("FRONTEND_URL normaliza dominio, barra final y varios orígenes para CORS", () => {
+  assert.equal(
+    parseConfig({ ...minimal, FRONTEND_URL: "afifront.vercel.app/" })
+      .FRONTEND_URL,
+    "https://afifront.vercel.app",
+  );
+  assert.equal(
+    parseConfig({
+      ...minimal,
+      FRONTEND_URL: "https://afifront.vercel.app/, http://localhost:3000/",
+    }).FRONTEND_URL,
+    "https://afifront.vercel.app,http://localhost:3000",
+  );
+  assert.throws(() =>
+    parseConfig({ ...minimal, FRONTEND_URL: "ftp://afifront.vercel.app" }),
+  );
+});
 test("Solo las seis variables del despliegue habilitan IA con valores completos", () => {
   const config = parseConfig(minimal);
   assert.equal(config.AI_ENABLED, true);

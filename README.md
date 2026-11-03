@@ -41,14 +41,18 @@ La versión 3 es ESM y puede provocar `ERR_REQUIRE_ESM` en el cargador de Vercel
 No elimines el override sin ejecutar la prueba de compatibilidad del runtime.
 El archivo lock debe instalarse con `npm ci` en cada despliegue.
 
-El preset se declara como `fastify` en `vercel.json`. El único punto de entrada
-es `src/server.ts`, que construye y arranca el servidor. `src/application.ts`
-contiene la fábrica utilizada por las pruebas y no es un punto de entrada.
-La raíz `/` devuelve información de AFIBACK; `/health` comprueba el proceso.
+Vercel utiliza la función HTTP `api/index.ts`, que reutiliza la aplicación
+Fastify mediante `src/vercel-handler.ts` sin llamar a `listen()` ni abrir un
+puerto. Las reescrituras conservan la ruta y los filtros de cada petición.
+`src/server.ts` sigue siendo la entrada para desarrollo y servidores Node.js
+persistentes. La raíz `/` devuelve información de AFIBACK y `/health` comprueba
+el proceso.
 
 En Vercel importa este repositorio como proyecto independiente, con Root Directory
-en la raíz, preset Fastify y sin un Output Directory estático personalizado como
-`dist`. Instala con `npm ci` y compila con `npm run build`. Usa Node.js 24.x.
+en la raíz y preset Other (la función se declara en `vercel.json`). Instala con
+`npm ci` y compila con `npm run build`; el directorio estático es `public`, no
+`dist`. Usa Node.js 24.x. No agregues un comando de inicio que abra un puerto
+en Vercel: la plataforma llama directamente a la función.
 El frontend debe apuntar al dominio **estable de producción** del backend,
 seguido de `/api/v1`; no a la URL del panel `vercel.com/...` ni a una URL temporal
 de despliegue protegida por Vercel Authentication.
@@ -59,10 +63,18 @@ de llegar a Fastify. Revisa Deployment Protection del dominio de producción.
 Esto es independiente de los JWT de AFI, que siguen siendo obligatorios para
 los datos personales y las operaciones financieras.
 
-El preset permite servir la API y Auth en Vercel Functions. La recuperación con
+La función permite servir la API y Auth en Vercel Functions. La recuperación con
 preguntas/códigos todavía requiere almacenamiento persistente; el archivo SQLite
 local no se conserva entre instancias o despliegues de Vercel. No configures una
 ruta temporal `/tmp` como sustituto de almacenamiento persistente de recuperación.
+
+CORS: `FRONTEND_URL=https://afifront.vercel.app` admite el origen de producción.
+Se normalizan dominios sin protocolo y barras finales; varios orígenes se
+separan con comas. El preflight `OPTIONS /api/v1/auth/login` debe responder 204
+con `Access-Control-Allow-Origin` para ese dominio. No se permite `*` ni se
+elimina la verificación de sesión. Si `/health` no responde o Vercel devuelve
+un error antes de invocar la función, el navegador también puede mostrarlo como
+error de CORS: primero comprueba el arranque del backend.
 
 ## Autenticación centralizada
 

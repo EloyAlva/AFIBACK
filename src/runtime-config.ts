@@ -61,12 +61,31 @@ export function parseConfig(environment: Record<string, string | undefined>) {
       input.FRONTEND_URL ??
       (production ? defaults.productionFrontend : defaults.developmentFrontend),
   });
+  const origins = parsed.FRONTEND_URL.split(",").map((value) => {
+    const address = value.trim();
+    const local = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/i.test(
+      address,
+    );
+    const url = new URL(
+      /^[a-z][a-z\d+.-]*:\/\//i.test(address)
+        ? address
+        : (local ? "http://" : "https://") + address,
+    );
+    if (
+      !["http:", "https:"].includes(url.protocol) ||
+      url.username ||
+      url.password
+    )
+      throw Error("FRONTEND_URL debe contener dominios HTTP(S) válidos");
+    return url.origin;
+  });
   // Never apply this model's prices to a different model or provider endpoint.
   const knownModel =
     parsed.AI_MODEL === defaults.ai.model &&
     parsed.AI_BASE_URL.replace(/\/+$/, "") === defaults.ai.baseUrl;
   return {
     ...parsed,
+    FRONTEND_URL: [...new Set(origins)].join(","),
     AI_ENABLED:
       parsed.AI_ENABLED === undefined
         ? !!parsed.AI_API_KEY
